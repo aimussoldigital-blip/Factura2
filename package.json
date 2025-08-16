@@ -1,18 +1,20 @@
 {
-  "name": "invoice-reader",
+  "name": "invoice-reader-node",
   "version": "1.0.0",
+  "description": "Lector de facturas (Node)",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "start": "node server.js"
   },
+  "engines": { "node": ">=18 <=20" },
   "dependencies": {
-    "express": "^4.18.2",
-    "multer": "^1.4.5",
+    "express": "^4.19.2",
+    "multer": "1.4.5-lts.1",
     "pdf-parse": "^1.1.1",
     "xlsx": "^0.18.5",
     "pdfkit": "^0.13.0",
-    "openai": "^4.0.0",
-    "ejs": "^3.1.9"
+    "ejs": "^3.1.9",
+    "openai": "^4.56.0"
   }
 }
