@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Lector de Facturas</title>
+</head>
+<body>
+  <h1>📄 Lector de Facturas</h1>
+
+  <form action="/upload" method="POST" enctype="multipart/form-data">
+    <input type="file" name="files" multiple>
+    <button type="submit">Procesar</button>
+  </form>
+
+  <h2>Resultados</h2>
+  <table border="1">
+    <tr><th>Número de Factura</th><th>Proveedor</th></tr>
+    <% results.forEach(r => { %>
+      <tr>
+        <td><%= r.nro_factura %></td>
+        <td><%= r.proveedor %></td>
+      </tr>
+    <% }) %>
+  </table>
+
+  <% if (results.length > 0) { %>
+    <a href="/download/excel">📊 Descargar Excel</a>
+    <a href="/download/pdf">📑 Descargar PDF</a>
+  <% } %>
+</body>
+</html>
