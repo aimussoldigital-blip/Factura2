@@ -1,46 +1,80 @@
-import express from "express";
-import multer from "multer";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { processFile } from "./src/processors.js";
-import { exportExcel, exportPDF } from "./src/exporters.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { processFolder } = require('./src/processors');
+const { exportXlsx, exportPdf } = require('./src/exporters');
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+const PORT = process.env.PORT || 3000;             // <- Render te inyecta este puerto
+const HOST = '0.0.0.0';                            // <- escuchar en todas las interfaces
 
-let results = [];
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const RESULTS_DIR = path.join(__dirname, 'results');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+if (!fs.existsSync(RESULTS_DIR)) fs.mkdirSync(RESULTS_DIR);
 
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.get("/", (req, res) => {
-  res.render("index", { results });
-});
+// healthcheck para Render
+app.get('/health', (_, res) => res.status(200).send('ok'));
 
-app.post("/upload", upload.array("files"), async (req, res) => {
-  results = [];
-  for (const file of req.files) {
-    const data = await processFile(file.path, file.originalname);
-    results.push(data);
-    fs.unlinkSync(file.path);
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, UPLOAD_DIR),
+  filename: (_, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, Date.now() + '_' + safe);
   }
-  res.redirect("/");
+});
+const upload = multer({ storage });
+
+app.get('/', (_, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-app.get("/download/excel", (req, res) => {
-  const file = exportExcel(results);
-  res.download(file, "facturas.xlsx", () => fs.unlinkSync(file));
+app.post('/api/upload', upload.array('files', 100), (req, res) => {
+  res.json({ ok: true, count: req.files?.length || 0 });
 });
 
-app.get("/download/pdf", (req, res) => {
-  const file = exportPDF(results);
-  res.download(file, "facturas.pdf", () => fs.unlinkSync(file));
+app.post('/api/process', async (req, res) => {
+  try {
+    const results = await processFolder(UPLOAD_DIR);
+    fs.writeFileSync(path.join(RESULTS_DIR, 'results.json'), JSON.stringify(results, null, 2));
+    res.json({ ok: true, results });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Servidor corriendo en puerto ${PORT}`));
+app.get('/api/results', (req, res) => {
+  try {
+    const f = path.join(RESULTS_DIR, 'results.json');
+    if (!fs.existsSync(f)) return res.json({ results: [] });
+    res.json({ results: JSON.parse(fs.readFileSync(f, 'utf8')) });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/export/xlsx', async (req, res) => {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(RESULTS_DIR, 'results.json'), 'utf8'));
+    const out = path.join(RESULTS_DIR, 'invoices.xlsx');
+    await exportXlsx(data, out);
+    res.download(out, 'invoices.xlsx');
+  } catch (e) { res.status(400).send('Primero procesa archivos.'); }
+});
+
+app.get('/api/export/pdf', async (req, res) => {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(RESULTS_DIR, 'results.json'), 'utf8'));
+    const out = path.join(RESULTS_DIR, 'invoices.pdf');
+    await exportPdf(data, out);
+    res.download(out, 'invoices.pdf');
+  } catch (e) { res.status(400).send('Primero procesa archivos.'); }
+});
+
+app.listen(PORT, HOST, () => {
+  console.log(`Servidor en http://${HOST}:${PORT}`);
+});
