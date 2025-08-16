@@ -1,9 +1,6 @@
 // src/extract.js (regex + heurística + combinación con OpenAI)
 const { OpenAI } = require('openai');
-
-
-const apiKey = process.env.OPENAI_API_KEY;
-const client = new OpenAI({ apiKey });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /* ---------- Normalización y patrones ---------- */
 function normalize(s) {
